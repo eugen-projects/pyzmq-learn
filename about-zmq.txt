@@ -1,0 +1,82 @@
+useful links:
+http://zeromq.github.io/pyzmq/api/zmq.html - pyhton zmq API
+
+
+    ===== General Framework Considerations =====    
+    
+    - The entire communication in an Application is managed by a Context object. The Context manages the low-level data transfer and Socket object creation.
+    - The Context object uses a I/O thread in the background to get data from the network and then dispatch it the application. Local queues are used to exchange messages on the network and between applications which use the same Context.
+        - if no communication over the network is required, you don't need an I/O thread.
+    - Context object is used to create sockets which carry out the communication. Sockets could be of different types (REQ, REP, PUB, SUB, DEALER, etc.)
+    - ZMQ Sockets are not network sockets though they provide an API that is very similar to those of traditional sockets (close(), bind(), connect(), setsockopt(), etc.)
+        - ZMQ Sockets are more like queues which distribute messages according to the type of the Socket.
+        - ZMQ Sockets work with messages rather than byte streams
+        - ZMQ Sockets can connect and bind to multiple endpoints at the same time (in contrast traditional sockets can be connected or bound to a single address)
+        - ZMQ Sockets are not thread safe. Use one Socket should be used by a single thread.
+        - ZMQ Sockets' queue are limited in size (HWM - High-Water Mark). You can set/get the option on a Socket instance with get/set_hvm. When the number of messages queued reaches the HWM Sockets go into "mute state". Depeding on the Socket type the messages are either discarded or the sender is blocked.
+        - ZMQ Sockets can be of different types. Type specific (as well as general) options can be set by calling setsockopt()
+    
+    ===== Socket Types in ZMQ =====     
+    
+    - REQ - send and receives one message at a time. 
+        - Attempting to send 2 times consecutively will cause an error. Only works when sending and receiving in lock-step. 
+        - Can be connected to multiple address but will send one message to one address at a time. 
+        - The ordering is round-robin.
+        - Can send a message even if there are no servers listening. Once a Socket binds to the address and does a recv() the message from the client will be delivered.
+            ::: setsockopt
+    - REP - same as REQ except that it first receives and then sends. Also works in lock-step. 
+        - Can receive from multiple clients but before receiving from the next client needs to reply to the client from which it received the current message.
+        - The message which will be received first (if multiple are available) is the message that was sent first.
+        - Sending a reply to a client which has closed the connection does not generate an error, i.e. is silently ignored.
+            ::: setsockopt
+    - DEALER - can send and receive in any order and as many times as it likes.
+        - Can be connected to multiple addresses and send the messages in round-robin fashion.
+        - Will queue the messages until there is a service to receive them. Will block if the HWM is reached when sending messages or then receiving if no sender is available
+        - When connected to a REP service must send an empty message followed by one ore more actual body parts. Otherwise the REP discards the messages.
+        - Dealers can have identities (dealer_socket.setsockopt(zmq.IDENTITY, "some-id")). Then a router sends message it could target a specific dealer by including the ID as first part of the multipart message.
+            ::: setsockopt
+    - ROUTER - can send and receive multiple messages in any order but sends only to specified peers (i.e. not round-robin)
+        - Can be connected to multiple addresses.
+        - The messsage that it sends should contain an identity part and payload part. Identity part is removed when actual send takes place but is used to identify the party that receives the message.
+        - If the message is send to a non-existent destination it will be discarded unless "mandatory" option is set
+            ::: setsockopt
+    - PUB - 
+            ::: setsockopt
+    - SUB - 
+            ::: setsockopt
+                - setsockopt(zmq.SUBSCRIBE, topic-name)
+    - XPUB -
+            ::: setsockopt
+    - XSUB - 
+            ::: setsockopt
+    - PUSH -
+            ::: setsockopt
+    - PULL -
+            ::: setsockopt
+    - PAIR - 
+            ::: setsockopt
+    - STREAM -
+            ::: setsockopt
+    
+    
+    ===== Protocol Types in ZMQ =====   
+    
+    - inproc
+    - ipc
+    - tcp
+    - udp
+    - pgm 
+    - epgm
+    
+    ===== Messages in ZMQ =====   
+    
+    - Simple
+    - Multipart
+    
+    ===== PyZMQ as used in Windows DM Framework =====   
+    zmq.Context - container for all application's sockets and transport between inproc communication
+        - create one per process - zmq.Context.instance() for global app context or Context() to create separate context
+        - before terminating the process destroy it - context.destroy(linger=None). All active sockets should be closed before calling this. Clients should normally close the connections (otherwise the server will get a lot of sockets in TIME_WAIT state). There is a term() method but it doesn't close all sockets first. It actually waits for all sockets to be closed first before it returns.
+        
+    ! Problems with ZMQ API usage in Windows Framework !
+        - context is not destroyed explicitly in the client.
