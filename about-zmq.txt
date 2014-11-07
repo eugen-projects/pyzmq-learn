@@ -1,5 +1,8 @@
 useful links:
-http://zeromq.github.io/pyzmq/api/zmq.html - pyhton zmq API
+http://zeromq.github.io/pyzmq/api/zmq.html - python zmq API
+http://api.zeromq.org/ - official API for ZMQ
+http://rfc.zeromq.org/ - some communication patterns explained
+http://zeromq.org/tutorials:_start - community tutorials
 
 
     ===== General Framework Considerations =====    
