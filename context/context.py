@@ -5,8 +5,8 @@ logging.basicConfig(level=logging.INFO, format="%(name)s: %(asctime)s: %(levelna
 log_server = logging.getLogger(name="SERVER")
 log_client = logging.getLogger(name="CLIENT")
 
-print("Current libzmq version is %s" % zmq.zmq_version())  # ZMQ version
-print("Current  pyzmq version is %s" % zmq.__version__)  # python package version
+print("Current libzmq version is %s" % zmq.zmq_version())  # ZMQ version (4.0.5)
+print("Current  pyzmq version is %s" % zmq.__version__)  # python package version (14.4.1)
 
 
 def simple():
