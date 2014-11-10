@@ -3,6 +3,7 @@ http://zeromq.github.io/pyzmq/api/zmq.html - python zmq API
 http://api.zeromq.org/ - official API for ZMQ
 http://rfc.zeromq.org/ - some communication patterns explained
 http://zeromq.org/tutorials:_start - community tutorials
+http://api.zeromq.org/3-2:zmq-socket - patterns and socket types explained
 
 
     ===== General Framework Considerations =====    
@@ -11,16 +12,23 @@ http://zeromq.org/tutorials:_start - community tutorials
     - The Context object uses a I/O thread in the background to get data from the network and then dispatch it the application. Local queues are used to exchange messages on the network and between applications which use the same Context.
         - if no communication over the network is required, you don't need an I/O thread.
     - Context object is used to create sockets which carry out the communication. Sockets could be of different types (REQ, REP, PUB, SUB, DEALER, etc.)
+    - Context - container for all application's sockets and transport between inproc communication
+        - create one per process - zmq.Context.instance() for global app context or Context() to create separate context
+        - before terminating the process destroy it - context.destroy(linger=None). All active sockets should be closed before calling this.
+          Clients should normally close the connections (otherwise the server will get a lot of sockets in TIME_WAIT state).
+          There is a term() method but it doesn't close all sockets first. It actually waits for all sockets to be closed first before it returns.
+
     - ZMQ Sockets are not network sockets though they provide an API that is very similar to those of traditional sockets (close(), bind(), connect(), setsockopt(), etc.)
         - ZMQ Sockets are more like queues which distribute messages according to the type of the Socket.
+            - the send() method is called the message is only queued internally. It doesn't mean that it was already sent.
         - ZMQ Sockets work with messages rather than byte streams
         - ZMQ Sockets can connect and bind to multiple endpoints at the same time (in contrast traditional sockets can be connected or bound to a single address)
         - ZMQ Sockets are not thread safe. Use one Socket should be used by a single thread.
         - ZMQ Sockets' queue are limited in size (HWM - High-Water Mark). You can set/get the option on a Socket instance with get/set_hvm. When the number of messages queued reaches the HWM Sockets go into "mute state". Depeding on the Socket type the messages are either discarded or the sender is blocked.
         - ZMQ Sockets can be of different types. Type specific (as well as general) options can be set by calling setsockopt()
+        - ZMQ Sockets can be bound to many endpoints at once !
     
-    ===== Socket Types in ZMQ =====     
-    
+    ===== Socket Types in ZMQ =====
     - REQ - send and receives one message at a time. 
         - Attempting to send 2 times consecutively will cause an error. Only works when sending and receiving in lock-step. 
         - Can be connected to multiple address but will send one message to one address at a time. 
@@ -75,11 +83,18 @@ http://zeromq.org/tutorials:_start - community tutorials
     
     - Simple
     - Multipart
-    
-    ===== PyZMQ as used in Windows DM Framework =====   
-    zmq.Context - container for all application's sockets and transport between inproc communication
-        - create one per process - zmq.Context.instance() for global app context or Context() to create separate context
-        - before terminating the process destroy it - context.destroy(linger=None). All active sockets should be closed before calling this. Clients should normally close the connections (otherwise the server will get a lot of sockets in TIME_WAIT state). There is a term() method but it doesn't close all sockets first. It actually waits for all sockets to be closed first before it returns.
-        
-    ! Problems with ZMQ API usage in Windows Framework !
-        - context is not destroyed explicitly in the client.
+
+    ===== Messaging patterns in ZMQ =====
+
+    - GENERAL CONSIDERATIONS
+        - socket types shouldn't be combined arbitrarily. They come in pairs to implement a communication pattern between endpoints.
+        - valid (direct) socket combinations. Either side can bind() or connect()
+            PUB and SUB
+            REQ and REP
+            REQ and ROUTER
+            DEALER and REP
+            DEALER and ROUTER
+            DEALER and DEALER
+            ROUTER and ROUTER
+            PUSH and PULL
+            PAIR and PAIR
