@@ -26,6 +26,12 @@ http://rfc.zeromq.org/spec:15 - message format on the wire
         - ZMQ Sockets can connect and bind to multiple endpoints at the same time (in contrast traditional sockets can be connected or bound to a single address)
         - ZMQ Sockets are not thread safe. Use one Socket should be used by a single thread.
         - ZMQ Sockets' queue are limited in size (HWM - High-Water Mark). You can set/get the option on a Socket instance with get/set_hvm. When the number of messages queued reaches the HWM Sockets go into "mute state". Depeding on the Socket type the messages are either discarded or the sender is blocked.
+            - some sockets have only send or only receive buffers. Some both. Depends on the type.
+                : PUB, PUSH - only send buffers (because they can't receive messages)
+                : SUB, PULL, REQ, REP - only receive buffers (SUB, PULL can't send messages) and REQ/REP can only send one message at a time.
+                : DEALER, ROUTER, PAIR - both types
+            - hwm settings are not exact (e.g. if you set a limit for 1000 buffered messages it could be lower)
+            - inproc hwm is the sum of hwm on both the receiver and sender sides
         - ZMQ Sockets can be of different types. Type specific (as well as general) options can be set by calling setsockopt()
         - ZMQ Sockets can be bound to many endpoints at once !
         - ZMQ Sockets must be closed in the thread that created them
@@ -57,6 +63,7 @@ http://rfc.zeromq.org/spec:15 - message format on the wire
     - PUB - sends a message to a list of subscribers. Note that each message is sent to each subscriber (i.e. duplicated so the hwm for sending messages should be increased if more subscribers are added)
         - best way to send message is to create a multipart message with first part the topic name and second part the message contents.
         - also can add between the 2 parts the address of the publisher so that the subscriber can send smth. to the publisher via another socket (can't use PUB to receive message)
+        - messages are discarded if the HWM is reached
             ::: setsockopt
     - SUB - receives message from a topic it is subscribed to. The topic name is taken by prefix matching against the message contents
             ::: setsockopt
