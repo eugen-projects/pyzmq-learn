@@ -21,9 +21,10 @@ def create_client(context, address):
 
 def send_message(participant, message):
     if isinstance(message, list):
-        for part in message[:-1]:
-            participant.send_multipart(part, flags=zmq.SNDMORE)
-        participant.send_multipart(message[-1])
+        participant.send_multipart(message)  # internally the list is iterated as in the code commented below
+        #for part in message[:-1]:
+        #    participant.send_multipart(part, flags=zmq.SNDMORE)  # send() works too
+        #participant.send_multipart(message[-1])
     else:
         return participant.send(message)
 
