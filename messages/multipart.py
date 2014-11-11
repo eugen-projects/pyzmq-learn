@@ -29,15 +29,18 @@ def send_message(participant, message):
         return participant.send(message)
 
 
-def receive_message(participant, is_multipart=False):
+def receive_message(participant):
     """
     Multipart message can only be received with recv_multipart().
     Otherwise only the first part if returned by recv().
+
+    recv_multipart() can be used to get single-part message but it returns a list of one item instead of a the message body
     """
-    if not is_multipart:
-        return participant.recv()
+    msg = participant.recv_multipart()
+    if isinstance(msg, list) and len(msg) == 1:
+        return msg[0]
     else:
-        return participant.recv_multipart()  # copy=False returns the Frame rather than part payload
+        return msg
 
 
 def clean_up(context, *sockets):
@@ -52,9 +55,10 @@ def main():
     client = create_client(context, 'tcp://127.0.0.1:5555')
 
     msg = ['A', 'B', 'C']
+    #msg = 'A'
     status = send_message(client, msg)
     log_client.info("Sent message: %s", msg)
-    msg = receive_message(server, is_multipart=True)
+    msg = receive_message(server)
     log_server.info("Received: %s", msg)
 
     clean_up(context, server, client)
