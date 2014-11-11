@@ -70,9 +70,9 @@ def _get_message(sock):
 def _send_signature(sock):
     signature = 'ff00000000000000017f'
     revision = '01'
-    socket_type = '04'
-    identity = '0000'
-    msg = struct.pack("!10sss2s", signature.decode('hex'), revision.decode('hex'), socket_type.decode('hex'),
+    socket_type = zmq.REP
+    identity = '0005457567656e'
+    msg = struct.pack("!10ssB%ds" % len(identity.decode('hex')), signature.decode('hex'), revision.decode('hex'), socket_type,
                       identity.decode('hex'))
     sock.sendall(msg)
     log_receiver.info("Sent: %s", msg.encode('hex'))
