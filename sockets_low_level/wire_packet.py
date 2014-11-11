@@ -79,7 +79,7 @@ def _send_signature(sock):
 
 
 def _send_message(sock, msg, receiver_sock_type):
-    if receiver_sock_type in [zmq.REQ]:
+    if receiver_sock_type in [zmq.REQ]:  # some socket types do not understand identities but require an empty frame
         preamble = '0100'.decode('hex')
         sock.sendall(preamble)
         log_receiver.info("Sent: %s", preamble.encode('hex'))
