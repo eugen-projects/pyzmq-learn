@@ -57,7 +57,9 @@ http://rfc.zeromq.org/spec:15 - message format on the wire
             ::: setsockopt
     - ROUTER - can send and receive multiple messages in any order but sends only to specified peers (i.e. not round-robin)
         - Can be connected to multiple addresses.
-        - The messsage that it sends should contain an identity part and payload part. Identity part is removed when actual send takes place but is used to identify the party that receives the message.
+        - The message that it sends should contain an identity part and payload part. Identity part is removed when actual send takes place but is used to identify the party that receives the message.
+        - When the router receives the message it adds as first frame the id of the sender
+        - When sending the message you must add manually the identity of the receiver as the message's first frame
         - If the message is send to a non-existent destination it will be discarded unless "mandatory" option is set
             ::: setsockopt
     - PUB - sends a message to a list of subscribers. Note that each message is sent to each subscriber (i.e. duplicated so the hwm for sending messages should be increased if more subscribers are added)

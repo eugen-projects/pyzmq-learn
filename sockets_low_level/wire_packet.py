@@ -2,6 +2,7 @@ import logging
 import socket
 import struct
 import threading
+import time
 import zmq
 
 
@@ -25,9 +26,20 @@ def _get_revision(sock):
 
 
 def _get_sock_type(sock):
+    sock_type = {
+        0: "PAIR",
+        1: "PUB",
+        2: "SUB",
+        3: "REQ",
+        4: "REP",
+        5: "DEALER",
+        6: "ROUTER",
+        7: "PULL",
+        8: "PUSH"
+    }
     msg = sock.recv(1)
     assert len(msg) == 1
-    log_receiver.info("Got socket type: %s", msg.encode('hex'))
+    log_receiver.info("Got socket type: %s", sock_type[ord(msg)])
 
 
 def _get_identity(sock):
@@ -40,6 +52,7 @@ def _get_identity(sock):
         assert len(msg) == id_len
         log_receiver.info("Got identity: %s", (prefix + msg).encode('hex'))
         return msg
+    log_receiver.info("Got identity: %s", msg.encode('hex'))
 
 
 def _get_message(sock):
@@ -98,39 +111,50 @@ def receive_in_loop(ip, port, receiver_sock_type):
     sock.bind((ip, port))
     sock.listen(5)
 
-    while True:
-        try:
-            client_sock, addr = sock.accept()
-            log_receiver.info("---GREETING STAGE---")
+    try:
+        client_sock, addr = sock.accept()
+        log_receiver.info("---GREETING STAGE---")
 
-            sender_sig = _get_signature(client_sock)
+        sender_sig = _get_signature(client_sock)
 
-            _send_signature(client_sock)
+        _send_signature(client_sock)
 
-            _get_revision(client_sock)
+        _get_revision(client_sock)
 
-            _get_sock_type(client_sock)
+        _get_sock_type(client_sock)
 
-            sender_id = _get_identity(client_sock)
+        sender_id = _get_identity(client_sock)
 
+        if receiver_sock_type != zmq.ROUTER:
             msg = _get_message(client_sock)
-
             _send_message(client_sock, "ack", receiver_sock_type)
+        else:
+            _send_message(client_sock, "hello", receiver_sock_type)
+            msg = _get_message(client_sock)
+        client_sock.close()
+    except Exception:
+        log_receiver.warn("exception", exc_info=True)
+    finally:
+        sock.close()
 
-            client_sock.close()
-        except Exception:
-            log_receiver.warn("exception", exc_info=True)
-            sock.close()
-            break
 
-
-def main():
-    context = zmq.Context()
-    endpoint = "tcp://127.0.0.1:5555"
-    sender_sock_type = zmq.DEALER
-    receiver_thread = threading.Thread(target=receive_in_loop, args=('127.0.0.1', 5555, sender_sock_type))
+def test_REQ(context, endpoint):
+    sender_sock_type = zmq.REQ
+    receiver_thread = threading.Thread(target=receive_in_loop, args=('127.0.0.1', 5555, zmq.REQ))
     receiver_thread.start()
+    sender = context.socket(sender_sock_type)
+    sender.connect(endpoint)
+    sender.send("test")
+    log_sender.info("Sent message")
+    msg = sender.recv()
+    log_sender.info("Got reply: %s", msg)
+    return receiver_thread
 
+
+def test_DEALER(context, endpoint):
+    sender_sock_type = zmq.DEALER
+    receiver_thread = threading.Thread(target=receive_in_loop, args=('127.0.0.1', 5555, zmq.DEALER))
+    receiver_thread.start()
     sender = context.socket(sender_sock_type)
     sender.setsockopt(zmq.IDENTITY, 'abc')
     sender.connect(endpoint)
@@ -138,9 +162,36 @@ def main():
     log_sender.info("Sent message")
     msg = sender.recv()
     log_sender.info("Got reply: %s", msg)
+    return receiver_thread
+
+
+def test_ROUTER(context, endpoint):
+    sender_sock_type = zmq.ROUTER
+    receiver_thread = threading.Thread(target=receive_in_loop, args=('127.0.0.1', 5555, zmq.ROUTER))
+    receiver_thread.start()
+    sender = context.socket(sender_sock_type)
+    sender.setsockopt(zmq.ROUTER_MANDATORY, 1)  # instead of silently dropping unroutable messages, throw an exception
+    sender.connect(endpoint)
+    msg = sender.recv_multipart()
+    log_sender.info("Got reply: %s", msg)
+    sender.send_multipart([msg[0], "test"])  # without address the message is dropped
+    log_sender.info("Sent message")
+    time.sleep(0.5)
+    return receiver_thread
+
+
+def main():
+    context = zmq.Context()
+    endpoint = "tcp://127.0.0.1:5555"
+
+    receiver_thread = test_REQ(context, endpoint)
+    receiver_thread.join()
+    receiver_thread = test_DEALER(context, endpoint)
+    receiver_thread.join()
+    receiver_thread = test_ROUTER(context, endpoint)
+    receiver_thread.join()
 
     context.destroy(linger=1)
-    receiver_thread.join()
 
 
 if __name__ == "__main__":
